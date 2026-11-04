@@ -25,6 +25,11 @@
             android:label="@string/batch_title"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ui.LogActivity"
+            android:exported="false"
+            android:label="@string/log_title" />
+
         <!-- 宿主进程读取模块配置的通道 -->
         <provider
             android:name=".core.ConfigProvider"

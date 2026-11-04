@@ -4,6 +4,7 @@ import android.app.Application
 import com.fuoins.opponote.core.FeatureRegistry
 import com.fuoins.opponote.core.HookContext
 import com.fuoins.opponote.core.Prefs
+import com.fuoins.opponote.util.LogSink
 import com.fuoins.opponote.util.XLog
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
@@ -41,7 +42,10 @@ class ModuleEntry : IXposedHookLoadPackage {
     }
 
     private fun install(app: Application, lpparam: XC_LoadPackage.LoadPackageParam) {
+        // 先接入日志通道，后续任何一步失败都能在「运行日志」里看到
+        LogSink.attach(app)
         XLog.i("Application ready, installing features")
+
         val context = HookContext(
             app = app,
             classLoader = lpparam.classLoader,
@@ -50,6 +54,7 @@ class ModuleEntry : IXposedHookLoadPackage {
             targetPackage = TARGET_PACKAGE,
         )
         FeatureRegistry.installAll(context)
+        LogSink.flushNow()
     }
 
     companion object {

@@ -36,6 +36,10 @@ class SettingsActivity : Activity() {
         addEntry(entryContainer, getString(R.string.home_entry_title), getString(R.string.home_entry_summary)) {
             Toast.makeText(this, "首页样式正在适配，开关见下方", Toast.LENGTH_SHORT).show()
         }
+        addDivider(entryContainer)
+        addEntry(entryContainer, getString(R.string.log_entry_title), getString(R.string.log_entry_summary)) {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
 
         val switchContainer = findViewById<LinearLayout>(R.id.switch_container)
         addSwitch(
