@@ -52,6 +52,16 @@ object NoUpdateDialogFeature : Feature {
 
 2. 注册到 `FeatureRegistry.all`，UI 开关会自动出现。
 
+## 待定功能（按需实现）
+
+框架已就绪，以下方向可按需求逐项实现，每项独立成一个 `Feature`：
+
+- 去广告 / 去推广位（开屏、信息流、Banner）
+- 去更新提示（强制升级弹窗）
+- 解除导出 / 分享格式限制
+
+> 新增功能请先在真机确认目标类与方法签名，再编写 Hook；`XLog` + LSPosed 日志可直接观察调用链。
+
 ## 构建
 
 ### GitHub Actions（推荐）
