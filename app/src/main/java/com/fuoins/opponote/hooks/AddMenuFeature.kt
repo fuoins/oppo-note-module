@@ -2,6 +2,8 @@ package com.fuoins.opponote.hooks
 
 import android.content.Context
 import android.content.Intent
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.PopupWindow
 import com.fuoins.opponote.ModuleEntry
 import com.fuoins.opponote.core.Feature
@@ -30,6 +32,10 @@ import java.lang.reflect.Method
  * 旧实现注入的 ExtraOptionMenu / COUIPopupListWindow 在本版本中已被弃用
  * （全 APK 零引用，是旧编辑器的死代码），因此之前「添加」面板里看不到入口。
  *
+ * v1.3.2：面板注入在部分机型上不显示，增加更可靠的第二入口——
+ * 编辑页右上角「三个点」菜单（WVNoteViewEditFragment#onCreateOptionsMenu /
+ * #onOptionsItemSelected），MenuItem id 用 0x7F0A0001 避开宿主 0x7F09 段。
+ *
  * 面板类型判别：插入面板列表包含 album / take_photo / paint_entry / title_table /
  * title_file / scan_document / ocr 等 type，而「/」斜杠格式菜单只有 title /
  * subtitle / bullet / numbered 等，据此只对插入面板注入。
@@ -37,12 +43,15 @@ import java.lang.reflect.Method
 class AddMenuFeature : Feature {
 
     override val id = "add_menu"
-    override val title = "「添加」面板入口"
-    override val summary = "在笔记编辑页的添加面板中加入「批量与排版」"
+    override val title = "批量排版入口"
+    override val summary = "编辑页「＋」面板与右上角三点菜单加入「批量与排版」"
     override val enabledByDefault = true
 
     /** 自定义项的 type 标识，避开原生类型 */
     private val customType = "batch_format"
+
+    /** 三点菜单里自定义项的 MenuItem id（0x7F0A 段，宿主菜单 id 都在 0x7F09 段） */
+    private val customMenuId = 0x7F0A0001
 
     /** 自定义项在「添加」面板中显示的图标（宿主资源：提取文字图标） */
     private val iconRes = 0x7F0800C2 // 2131233410
@@ -75,6 +84,23 @@ class AddMenuFeature : Feature {
             "addQuickInput",
             before = { XLog.i("add_menu: 「＋」被点击 (addQuickInput)") },
         )
+
+        // 注入点 ③：编辑页右上角「三个点」菜单追加「批量与排版」
+        // 注入点 ④：拦截三点菜单里自定义项的点击
+        // 覆盖普通笔记 / 快捷便签 / 涂鸦便签三种编辑页 Fragment
+        for (cls in MENU_FRAGMENT_CLASSES) {
+            val menuHooked = ctx.hookAllMethods(
+                cls,
+                "onCreateOptionsMenu",
+                after = { param: XC_MethodHook.MethodHookParam -> addThreeDotEntry(param) },
+            )
+            val itemHooked = ctx.hookAllMethods(
+                cls,
+                "onOptionsItemSelected",
+                before = { param: XC_MethodHook.MethodHookParam -> interceptMenuClick(param) },
+            )
+            XLog.i("add_menu: 三点菜单 hook $cls menu=$menuHooked item=$itemHooked")
+        }
     }
 
     /** 在弹窗 setData 时追加自定义项 */
@@ -141,6 +167,34 @@ class AddMenuFeature : Feature {
         launch(context)
     }
 
+    /** 三点菜单：在 onCreateOptionsMenu 执行完后追加「批量与排版」 */
+    private fun addThreeDotEntry(param: XC_MethodHook.MethodHookParam) {
+        val menu = param.args.getOrNull(0) as? Menu ?: return
+        // 宿主每次重建菜单都先 clear()，防御性去重
+        if (menu.findItem(customMenuId) != null) return
+        runCatching {
+            val item = menu.add(Menu.NONE, customMenuId, 100, ENTRY_TITLE)
+            item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+            item.setIcon(iconRes)
+            XLog.i("add_menu: 三点菜单已添加「批量与排版」")
+        }.onFailure { XLog.e("add_menu: 三点菜单添加失败", it) }
+    }
+
+    /** 三点菜单：点击「批量与排版」时拦截并打开模块界面 */
+    private fun interceptMenuClick(param: XC_MethodHook.MethodHookParam) {
+        val item = param.args.getOrNull(0) as? MenuItem ?: return
+        if (item.itemId != customMenuId) return
+
+        param.result = true
+        XLog.i("add_menu: 点击三点菜单「批量与排版」")
+
+        val fragment = param.thisObject
+        val context = runCatching {
+            fragment.javaClass.getMethod("getActivity").invoke(fragment) as? Context
+        }.getOrNull()
+        launch(context)
+    }
+
     private fun dismissPopup(manager: Any?) {
         val field = manager?.javaClass?.getDeclaredField("popupWindow") ?: return
         field.isAccessible = true
@@ -180,6 +234,11 @@ class AddMenuFeature : Feature {
             "com.nearme.note.activity.richedit.entity.RichFormatMenuData"
         private const val FRAGMENT_CLASS =
             "com.nearme.note.activity.richedit.webview.WVNoteViewEditFragment"
+        private val MENU_FRAGMENT_CLASSES = listOf(
+            FRAGMENT_CLASS,
+            "com.nearme.note.activity.richedit.webview.WVQuickNoteViewEditFragment",
+            "com.nearme.note.activity.richedit.coverpaint.WVNoteViewEditFragmentCoverPaint",
+        )
         private const val BATCH_ACTIVITY = "com.fuoins.opponote.ui.BatchFormatActivity"
         private const val ENTRY_TITLE = "批量与排版"
     }
