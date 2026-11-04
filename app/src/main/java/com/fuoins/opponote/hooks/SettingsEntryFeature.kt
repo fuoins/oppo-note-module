@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import de.robv.android.xposed.XC_MethodHook
 import com.fuoins.opponote.ModuleEntry
 import com.fuoins.opponote.core.Feature
 import com.fuoins.opponote.core.HookContext
@@ -35,7 +36,7 @@ object SettingsEntryFeature : Feature {
             "onCreatePreferences",
             Bundle::class.java,
             String::class.java,
-            after = { param ->
+            after = { param: XC_MethodHook.MethodHookParam ->
                 runCatching { addEntry(param.thisObject) }
                     .onFailure { XLog.e("add settings entry failed", it) }
             },

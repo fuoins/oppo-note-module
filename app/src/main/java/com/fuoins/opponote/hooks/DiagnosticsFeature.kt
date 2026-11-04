@@ -4,6 +4,7 @@ import android.os.Bundle
 import com.fuoins.opponote.core.Feature
 import com.fuoins.opponote.core.HookContext
 import com.fuoins.opponote.util.XLog
+import de.robv.android.xposed.XC_MethodHook
 
 /**
  * 框架自检：只写日志，确认注入与 Hook 链路是否正常。
@@ -34,7 +35,7 @@ object DiagnosticsFeature : Feature {
             "com.nearme.note.main.MainActivity",
             "onCreate",
             Bundle::class.java,
-            after = { XLog.i("diagnostics: MainActivity.onCreate reached") },
+            after = { _: XC_MethodHook.MethodHookParam -> XLog.i("diagnostics: MainActivity.onCreate reached") },
         )
     }
 }
