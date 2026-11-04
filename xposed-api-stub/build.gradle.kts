@@ -1,10 +1,19 @@
 plugins {
-    id("java-library")
+    id("com.android.library")
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+android {
+    namespace = "de.robv.android.xposed.stub"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 29
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
 }
 
 // 该模块仅用于编译期，运行时由 Xposed/LSPosed 框架提供同名类，
