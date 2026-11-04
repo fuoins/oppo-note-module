@@ -21,6 +21,10 @@
 
 - **模块无桌面图标**：安装后不在桌面显示，避免误触；
 - **设置页入口**：在便签「设置」列表底部插入「模块设置」，点击进入模块界面；
+- **运行日志**：便签进程的日志经 ContentProvider 跨进程落盘，在「模块设置 → 运行日志」直接查看，
+  支持复制 / 分享 / 清空，无需连电脑看 logcat；
+- **「添加」面板入口**：笔记编辑页点「＋」弹出的添加面板里插入「批量与排版」，
+  注入点是 `COUIPopupListWindow.setItemList(List)`，复用原生菜单样式；
 - **批量与排版**：
   - 字段可自由组合：日历、任意文字（完成 / 忘记 / …）；
   - 日历支持 Java 日期格式，内置 `11.04`、`11月4日`、`2026年11月4日`、`11月4日 周三`、`11.04 14:30` 等预设，也可自定义；
@@ -33,11 +37,14 @@
 
 ### 适配中
 
-- 待办每日刷新、一行多列、勾选框右置；
+- 待办勾选框右置、一行多个（编辑页待办块由 WebView 富文本渲染，需按真实 DOM 写 CSS）；
+- 待办每日刷新（恢复勾选状态）；
 - 首页列表样式增强。
 
-这两项需要改动便签的 RecyclerView 与 ViewBinding 布局（`TodoAdapter`、`com.oplus.note.databinding.*`），
-不同 ROM 版本布局存在差异，需结合真机日志逐步适配。开关已在模块设置中预留，默认关闭。
+编辑页正文是 `com.oplus.richtext` 的 WebView 富文本，类名混淆、资源名被改写，
+无法靠静态分析确定待办块的 DOM 结构。模块内置了**结构探测**（`web_probe`）：
+页面加载完成后注入一段**只读**脚本，把元素统计与待办候选节点的 `outerHTML` 写入运行日志。
+拿这份结构即可精确编写 CSS 规则，不需要靠猜。
 
 ## 安装与生效
 
@@ -45,12 +52,14 @@
 2. LSPosed 中启用「OPPO便签模块」，作用域勾选「便签」；
 3. 强行停止便签，重新打开；
 4. 便签「设置」→ 最下方「模块设置」；
-5. 验证：`adb logcat -s OPPONote` 应出现
+5. 验证：进入「模块设置 → 运行日志」，应能看到
    ```
-   loadPackage: process=com.coloros.note
-   Application ready, installing features
-   settings entry hooked=true
-   settings entry added
+   I loadPackage: process=com.coloros.note
+   I Application ready, installing features
+   I installed [add_menu]
+   I add_menu: setItemList hooked=1
+   I installed [web_probe]
+   I web_probe: hooked XxxWebViewClient#onPageFinished
    ```
 
 > 修改开关后需强行停止便签进程再打开才生效。
