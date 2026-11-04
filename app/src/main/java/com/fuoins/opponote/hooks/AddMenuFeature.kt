@@ -58,6 +58,9 @@ class AddMenuFeature : Feature {
 
     private var launchedAt = 0L
 
+    /** 诊断日志限流：其他菜单项点击 */
+    private var clickLogAt = 0L
+
     /** 只在第一次跳过注入时记日志，避免斜杠菜单刷屏 */
     private var skipLogged = false
 
@@ -101,6 +104,23 @@ class AddMenuFeature : Feature {
             )
             XLog.i("add_menu: 三点菜单 hook $cls menu=$menuHooked item=$itemHooked")
         }
+
+        // 注入点 ⑤：Activity 层兜底拦截——宿主可能先于 Fragment 消费菜单点击
+        // （v1.3.2 现象：点击「批量与排版」后退回主页且 Fragment 层无日志，
+        //   说明点击未分发到 Fragment.onOptionsItemSelected）
+        val faHooked = ctx.hookAllMethods(
+            "androidx.fragment.app.FragmentActivity",
+            "onMenuItemSelected",
+            before = { param: XC_MethodHook.MethodHookParam -> interceptActivityClick(param, "FragmentActivity#onMenuItemSelected") },
+        )
+        XLog.i("add_menu: FragmentActivity#onMenuItemSelected hooked=$faHooked")
+
+        val actHooked = ctx.hookAllMethods(
+            "android.app.Activity",
+            "onOptionsItemSelected",
+            before = { param: XC_MethodHook.MethodHookParam -> interceptActivityClick(param, "Activity#onOptionsItemSelected") },
+        )
+        XLog.i("add_menu: Activity#onOptionsItemSelected hooked=$actHooked")
     }
 
     /** 在弹窗 setData 时追加自定义项 */
@@ -176,23 +196,55 @@ class AddMenuFeature : Feature {
             val item = menu.add(Menu.NONE, customMenuId, 100, ENTRY_TITLE)
             item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
             item.setIcon(iconRes)
-            XLog.i("add_menu: 三点菜单已添加「批量与排版」")
+            // 诊断：打印菜单全貌，确认自定义项位置与溢出菜单行为
+            val items = (0 until menu.size()).mapNotNull { i ->
+                val mi = menu.getItem(i)
+                "${mi.title}(${mi.itemId})"
+            }
+            XLog.i("add_menu: 三点菜单已添加「批量与排版」，菜单共 ${menu.size()} 项: $items")
         }.onFailure { XLog.e("add_menu: 三点菜单添加失败", it) }
     }
 
-    /** 三点菜单：点击「批量与排版」时拦截并打开模块界面 */
+    /** 三点菜单：点击「批量与排版」时拦截并打开模块界面（Fragment 层） */
     private fun interceptMenuClick(param: XC_MethodHook.MethodHookParam) {
         val item = param.args.getOrNull(0) as? MenuItem ?: return
-        if (item.itemId != customMenuId) return
+        if (item.itemId == customMenuId) {
+            param.result = true
+            XLog.i("add_menu: Fragment 层拦截「批量与排版」点击")
 
-        param.result = true
-        XLog.i("add_menu: 点击三点菜单「批量与排版」")
+            val fragment = param.thisObject
+            val context = runCatching {
+                fragment.javaClass.getMethod("getActivity").invoke(fragment) as? Context
+            }.getOrNull()
+            launch(context)
+            return
+        }
+        // 诊断：记录编辑页 Fragment 收到的其他菜单点击
+        logOtherClick("Fragment#onOptionsItemSelected", item, param.thisObject)
+    }
 
-        val fragment = param.thisObject
-        val context = runCatching {
-            fragment.javaClass.getMethod("getActivity").invoke(fragment) as? Context
-        }.getOrNull()
-        launch(context)
+    /** Activity 层兜底：FragmentActivity.onMenuItemSelected / Activity.onOptionsItemSelected */
+    private fun interceptActivityClick(param: XC_MethodHook.MethodHookParam, source: String) {
+        // FragmentActivity.onMenuItemSelected(int, MenuItem)；Activity.onOptionsItemSelected(MenuItem)
+        val item = param.args.getOrNull(1) as? MenuItem
+            ?: param.args.getOrNull(0) as? MenuItem ?: return
+        if (item.itemId == customMenuId) {
+            param.result = true
+            XLog.i("add_menu: $source 拦截「批量与排版」点击")
+            launch(param.thisObject as? Context)
+            return
+        }
+        logOtherClick(source, item, param.thisObject)
+    }
+
+    /** 诊断：编辑页相关 Activity/Fragment 收到的其他菜单点击（限流） */
+    private fun logOtherClick(source: String, item: MenuItem, owner: Any?) {
+        val cls = owner?.javaClass?.name ?: return
+        if (!cls.contains("RichEditActivity") && !cls.contains("NoteViewEditActivity")) return
+        val now = System.currentTimeMillis()
+        if (now - clickLogAt < 1500) return
+        clickLogAt = now
+        XLog.i("add_menu: 菜单点击[$source] ${item.title}(id=${item.itemId}) owner=$cls")
     }
 
     private fun dismissPopup(manager: Any?) {
