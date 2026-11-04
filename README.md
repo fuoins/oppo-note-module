@@ -23,8 +23,12 @@
 - **设置页入口**：在便签「设置」列表底部插入「模块设置」，点击进入模块界面；
 - **运行日志**：便签进程的日志经 ContentProvider 跨进程落盘，在「模块设置 → 运行日志」直接查看，
   支持复制 / 分享 / 清空，无需连电脑看 logcat；
-- **「添加」面板入口**：笔记编辑页点「＋」弹出的添加面板里插入「批量与排版」，
-  注入点是 `COUIPopupListWindow.setItemList(List)`，复用原生菜单样式；
+- **「添加」面板入口（v1.3.1 重做）**：笔记编辑页点「＋」弹出的底部网格面板里插入「批量与排版」。
+  真实链路经反编译确认：工具栏「＋」→ `WVNoteViewEditFragment.addQuickInput()`
+  → `RichTextFormatOptionMenuManager.addQuickInput()` → `enterSlash("toolbar_click")`
+  → `RichTextFormatOptionMenu.setData(List<RichFormatMenuData>)`。
+  模块在该处追加自定义项（type=`batch_format`），点击时在 `handleMatchMenu` 拦截并打开生成器。
+  （旧版注入的 `ExtraOptionMenu`/`COUIPopupListWindow` 是旧编辑器死代码，全 APK 零引用，已废弃。）
 - **三个功能开关**（默认全开，修改后需强行停止便签）：批量与排版 / 待办增强 / 首页样式；
 - **待办增强（v1.3.0）**：编辑页正文是 tiptap/ProseMirror 富文本（`assets/tiptap/index.html`），
   待办块结构为 `div.block-wrapper > div.block-wrapper-checkbox > div.checkbox-inner`。
@@ -60,9 +64,15 @@
    I loadPackage: process=com.coloros.note
    I Application ready, installing features
    I installed [add_menu]
-   I add_menu: setItemList hooked=1
+   I add_menu: RichTextFormatOptionMenu#setData hooked=1
+   I add_menu: handleMatchMenu hooked=1
    I installed [web_probe]
    I web_probe: hooked XxxWebViewClient#onPageFinished
+   ```
+   打开笔记点「＋」后，应新增：
+   ```
+   I add_menu: 「＋」被点击 (addQuickInput)
+   I add_menu: 已注入「批量与排版」，面板共 8 项
    ```
 
 > 修改开关后需强行停止便签进程再打开才生效。
