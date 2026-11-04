@@ -50,11 +50,8 @@ class AddMenuFeature : Feature {
     /** 自定义项的 type 标识，避开原生类型 */
     private val customType = "batch_format"
 
-    /** 三点菜单里自定义项的 MenuItem id（0x7F0A 段，宿主菜单 id 都在 0x7F09 段） */
+    /** 三点菜单里自定义项的 MenuItem id（宿主会重写动态 add 项的 id，以标题匹配为准） */
     private val customMenuId = 0x7F0A0001
-
-    /** 自定义项在「添加」面板中显示的图标（宿主资源：提取文字图标） */
-    private val iconRes = 0x7F0800C2 // 2131233410
 
     private var launchedAt = 0L
 
@@ -121,6 +118,28 @@ class AddMenuFeature : Feature {
             before = { param: XC_MethodHook.MethodHookParam -> interceptActivityClick(param, "Activity#onOptionsItemSelected") },
         )
         XLog.i("add_menu: Activity#onOptionsItemSelected hooked=$actHooked")
+
+        // 崩溃捕获：未捕获异常写本地文件（进程被杀时跨进程日志会丢失，
+        // 用户反馈的「退回主页」+ 进程 3 秒重启 4 次疑似崩溃重启，需要堆栈）
+        installCrashCapture(ctx)
+    }
+
+    /** 包装默认未捕获异常处理器，把崩溃堆栈写到宿主 filesDir */
+    private fun installCrashCapture(ctx: HookContext) {
+        runCatching {
+            val prev = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { t, e ->
+                runCatching {
+                    val file = java.io.File(ctx.app.filesDir, "opponote_crash.log")
+                    file.appendText(
+                        "\n=== ${java.util.Date()} ===\nthread=${t.name}\n" +
+                            android.util.Log.getStackTraceString(e) + "\n",
+                    )
+                }
+                prev?.uncaughtException(t, e)
+            }
+            XLog.i("add_menu: 崩溃捕获已安装 -> ${ctx.app.filesDir}/opponote_crash.log")
+        }.onFailure { XLog.e("add_menu: 崩溃捕获安装失败", it) }
     }
 
     /** 在弹窗 setData 时追加自定义项 */
@@ -134,8 +153,8 @@ class AddMenuFeature : Feature {
         if (!isInsertPanelList(list)) return
 
         val item = buildItem(ctx.classLoader) ?: return
-        runCatching { list.add(item) }
-            .onSuccess { XLog.i("add_menu: 已注入「批量与排版」，面板共 ${list.size} 项") }
+        runCatching { list.add(0, item) }
+            .onSuccess { XLog.i("add_menu: 已注入「批量与排版」到面板第一项，面板共 ${list.size} 项") }
             .onFailure { XLog.e("add_menu: 注入失败", it) }
     }
 
@@ -160,13 +179,13 @@ class AddMenuFeature : Feature {
         val ctor = cls.getConstructor(
             String::class.java,                     // menuName
             String::class.java,                     // type
-            Int::class.javaPrimitiveType!!,         // icon
+            Int::class.javaPrimitiveType!!,         // icon（0 = 不设图标，避免宿主资源 id 错误）
             java.lang.Boolean::class.java,          // isDarkerTextColorAndEnter（可空）
             Boolean::class.javaPrimitiveType!!,     // isChecked
             Boolean::class.javaPrimitiveType!!,     // isDivider
             Boolean::class.javaPrimitiveType!!,     // isTitle
         )
-        ctor.newInstance(ENTRY_TITLE, customType, iconRes, null, false, false, false)
+        ctor.newInstance(ENTRY_TITLE, customType, 0, null, false, false, false)
     }.onFailure { XLog.e("add_menu: 构造 RichFormatMenuData 失败", it) }.getOrNull()
 
     /** 点击自定义项：关闭面板并打开批量排版界面 */
@@ -203,7 +222,8 @@ class AddMenuFeature : Feature {
         runCatching {
             val item = menu.add(Menu.NONE, customMenuId, 100, ENTRY_TITLE)
             item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
-            item.setIcon(iconRes)
+            // 不设置 icon：宿主资源 id 易错（此前 0x7F0800C2 实为 COUI 动画
+            // drawable，可能引起溢出菜单渲染异常），标题文字足够
             // 关键：直接挂点击监听，在菜单分发最前端短路，
             // 绕开宿主对未知 id 的处理（v1.3.3 退回主页的根因）
             item.setOnMenuItemClickListener { _ ->
@@ -262,7 +282,10 @@ class AddMenuFeature : Feature {
     /** 诊断：编辑页相关 Activity/Fragment 收到的其他菜单点击（限流） */
     private fun logOtherClick(source: String, item: MenuItem, owner: Any?) {
         val cls = owner?.javaClass?.name ?: return
-        if (!cls.contains("RichEditActivity") && !cls.contains("NoteViewEditActivity")) return
+        if (!cls.contains("WVNoteViewEditFragment") &&
+            !cls.contains("RichEditActivity") &&
+            !cls.contains("NoteViewEditActivity")
+        ) return
         val now = System.currentTimeMillis()
         if (now - clickLogAt < 1500) return
         clickLogAt = now
