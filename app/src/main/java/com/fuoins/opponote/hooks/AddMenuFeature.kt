@@ -190,12 +190,27 @@ class AddMenuFeature : Feature {
     /** 三点菜单：在 onCreateOptionsMenu 执行完后追加「批量与排版」 */
     private fun addThreeDotEntry(param: XC_MethodHook.MethodHookParam) {
         val menu = param.args.getOrNull(0) as? Menu ?: return
-        // 宿主每次重建菜单都先 clear()，防御性去重
-        if (menu.findItem(customMenuId) != null) return
+        // 宿主每次重建菜单都先 clear()；注意宿主菜单系统会重写 add 传入的 itemId
+        // （实测传入 0x7F0A0001 被改写为 0x7F090001），因此用标题去重与匹配
+        for (i in 0 until menu.size()) {
+            if (menu.getItem(i).title.toString() == ENTRY_TITLE) return
+        }
+        val context = runCatching {
+            (param.thisObject as Any).javaClass.getMethod("getActivity")
+                .invoke(param.thisObject) as? Context
+        }.getOrNull()
+
         runCatching {
             val item = menu.add(Menu.NONE, customMenuId, 100, ENTRY_TITLE)
             item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
             item.setIcon(iconRes)
+            // 关键：直接挂点击监听，在菜单分发最前端短路，
+            // 绕开宿主对未知 id 的处理（v1.3.3 退回主页的根因）
+            item.setOnMenuItemClickListener { _ ->
+                XLog.i("add_menu: 菜单项点击监听触发，打开批量排版")
+                launch(context)
+                true
+            }
             // 诊断：打印菜单全貌，确认自定义项位置与溢出菜单行为
             val items = (0 until menu.size()).mapNotNull { i ->
                 val mi = menu.getItem(i)
@@ -208,7 +223,7 @@ class AddMenuFeature : Feature {
     /** 三点菜单：点击「批量与排版」时拦截并打开模块界面（Fragment 层） */
     private fun interceptMenuClick(param: XC_MethodHook.MethodHookParam) {
         val item = param.args.getOrNull(0) as? MenuItem ?: return
-        if (item.itemId == customMenuId) {
+        if (isOurItem(item)) {
             param.result = true
             XLog.i("add_menu: Fragment 层拦截「批量与排版」点击")
 
@@ -228,7 +243,7 @@ class AddMenuFeature : Feature {
         // FragmentActivity.onMenuItemSelected(int, MenuItem)；Activity.onOptionsItemSelected(MenuItem)
         val item = param.args.getOrNull(1) as? MenuItem
             ?: param.args.getOrNull(0) as? MenuItem ?: return
-        if (item.itemId == customMenuId) {
+        if (isOurItem(item)) {
             param.result = true
             XLog.i("add_menu: $source 拦截「批量与排版」点击")
             launch(param.thisObject as? Context)
@@ -236,6 +251,13 @@ class AddMenuFeature : Feature {
         }
         logOtherClick(source, item, param.thisObject)
     }
+
+    /**
+     * 判断是否为我们的菜单项。宿主菜单系统会重写 add 传入的 itemId
+     * （实测 0x7F0A0001 → 0x7F090001），因此以标题为准、id 为辅。
+     */
+    private fun isOurItem(item: MenuItem): Boolean =
+        item.itemId == customMenuId || item.title.toString() == ENTRY_TITLE
 
     /** 诊断：编辑页相关 Activity/Fragment 收到的其他菜单点击（限流） */
     private fun logOtherClick(source: String, item: MenuItem, owner: Any?) {
