@@ -1,38 +1,52 @@
 package com.fuoins.opponote
 
+import android.app.Application
 import com.fuoins.opponote.core.FeatureRegistry
 import com.fuoins.opponote.core.HookContext
 import com.fuoins.opponote.core.Prefs
 import com.fuoins.opponote.util.XLog
-import io.github.libxposed.api.XposedModule
-import io.github.libxposed.api.XposedModuleInterface
+import de.robv.android.xposed.IXposedHookLoadPackage
+import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 模块入口，由 assets/xposed_init 指定。
- * 生命周期：onModuleLoaded（每个进程一次）→ onPackageLoaded（每个包一次）。
+ * 使用传统 XposedBridge API（82），兼容所有 LSPosed 版本，不受 libxposed API 版本迭代影响。
  */
-class ModuleEntry : XposedModule() {
+class ModuleEntry : IXposedHookLoadPackage {
 
-    private var processName: String = ""
+    private val installed = AtomicBoolean(false)
 
-    override fun onModuleLoaded(param: XposedModuleInterface.ModuleLoadedParam) {
-        processName = param.processName
-        XLog.attach(this)
-        XLog.i("module loaded: process=$processName, api=$apiVersion")
+    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
+        if (lpparam.packageName != TARGET_PACKAGE) return
+
+        XLog.i("loadPackage: process=${lpparam.processName}, first=${lpparam.isFirstApplication}")
+        runCatching { hookApplicationCreate(lpparam) }
+            .onFailure { XLog.e("hook Application.onCreate failed", it) }
     }
 
-    override fun onPackageLoaded(param: XposedModuleInterface.PackageLoadedParam) {
-        if (param.packageName != TARGET_PACKAGE) return
+    private fun hookApplicationCreate(lpparam: XC_LoadPackage.LoadPackageParam) {
+        val onCreate = Application::class.java.getDeclaredMethod("onCreate")
+        XposedBridge.hookMethod(onCreate, object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                val app = param.thisObject as? Application ?: return
+                if (!installed.compareAndSet(false, true)) return
+                runCatching { install(app, lpparam) }
+                    .onFailure { XLog.e("install features failed", it) }
+            }
+        })
+        XLog.i("waiting for Application.onCreate")
+    }
 
-        XLog.attach(this)
-        if (processName.isEmpty()) processName = TARGET_PACKAGE
-        XLog.i("package loaded: ${param.packageName}, first=${param.isFirstPackage}, process=$processName")
-
+    private fun install(app: Application, lpparam: XC_LoadPackage.LoadPackageParam) {
+        XLog.i("Application ready, installing features")
         val context = HookContext(
-            module = this,
-            classLoader = param.defaultClassLoader,
-            prefs = Prefs(getRemotePreferences(Prefs.GROUP)),
-            processName = processName,
+            app = app,
+            classLoader = lpparam.classLoader,
+            prefs = Prefs.load(app),
+            processName = lpparam.processName ?: TARGET_PACKAGE,
             targetPackage = TARGET_PACKAGE,
         )
         FeatureRegistry.installAll(context)
@@ -40,5 +54,6 @@ class ModuleEntry : XposedModule() {
 
     companion object {
         const val TARGET_PACKAGE = "com.coloros.note"
+        const val MODULE_PACKAGE = "com.fuoins.opponote"
     }
 }

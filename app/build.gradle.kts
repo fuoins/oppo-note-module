@@ -8,7 +8,7 @@ val releaseKeystore: String? =
     System.getenv("KEYSTORE_FILE")?.takeIf { it.isNotBlank() && file(it).exists() }
 
 // 允许 CI 用 tag 覆盖版本号：./gradlew -PversionName=1.2.3 -PversionCode=12
-val ciVersionName: String = (findProperty("versionName") as String?) ?: "1.0.0"
+val ciVersionName: String = (findProperty("versionName") as String?) ?: "1.1.0"
 val ciVersionCode: String = (findProperty("versionCode") as String?) ?: "1"
 
 android {
@@ -80,7 +80,9 @@ android {
 }
 
 dependencies {
-    // 编译期依赖，运行时由 LSPosed 框架提供，绝不能打包进 APK
-    compileOnly("io.github.libxposed:api:102.0.0")
+    // 编译期依赖，运行时由 Xposed/LSPosed 框架提供，绝不能打包进 APK
+    compileOnly(project(":xposed-api-stub"))
     compileOnly("androidx.annotation:annotation:1.9.1")
+    // 仅编译期：运行时使用便签自带的 androidx.preference
+    compileOnly("androidx.preference:preference:1.2.1")
 }

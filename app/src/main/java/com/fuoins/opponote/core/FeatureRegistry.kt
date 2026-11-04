@@ -1,16 +1,17 @@
 package com.fuoins.opponote.core
 
 import com.fuoins.opponote.hooks.DiagnosticsFeature
+import com.fuoins.opponote.hooks.SettingsEntryFeature
 import com.fuoins.opponote.util.XLog
 
 /**
- * 功能注册表。新增功能在这里登记即可，模块入口与 UI 会自动感知。
+ * 功能注册表。新增功能在这里登记即可。
  */
 object FeatureRegistry {
 
     val all: List<Feature> = listOf(
+        SettingsEntryFeature,
         DiagnosticsFeature,
-        // TODO: 在此追加具体功能
     )
 
     fun find(id: String): Feature? = all.firstOrNull { it.id == id }
@@ -18,7 +19,7 @@ object FeatureRegistry {
     fun installAll(ctx: HookContext) {
         XLog.i("installing ${all.size} feature(s) in ${ctx.processName}")
         all.forEach { feature ->
-            val enabled = ctx.prefs.isEnabled(feature.id, feature.enabledByDefault)
+            val enabled = ctx.prefs.getBoolean(key(feature.id), feature.enabledByDefault)
             if (!enabled) {
                 XLog.i("skip [${feature.id}]: disabled")
                 return@forEach
@@ -31,4 +32,6 @@ object FeatureRegistry {
             }
         }
     }
+
+    fun key(featureId: String): String = "feature_$featureId"
 }

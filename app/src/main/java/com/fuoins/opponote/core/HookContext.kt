@@ -1,25 +1,24 @@
 package com.fuoins.opponote.core
 
+import android.app.Application
 import com.fuoins.opponote.util.XLog
-import io.github.libxposed.api.XposedInterface
-import io.github.libxposed.api.XposedModule
+import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XposedBridge
 import java.lang.reflect.Constructor
-import java.lang.reflect.Executable
 import java.lang.reflect.Method
 
 /**
- * 单个目标进程内的 Hook 上下文，封装类查找、方法查找与 Hook 注册，
- * 让具体功能只需关心目标类名与方法名。
+ * 目标进程内的 Hook 上下文。全部使用原生反射查找成员，
+ * 只依赖 XposedBridge.hookMethod 完成注册，最大限度降低对框架 API 的耦合。
  */
 class HookContext(
-    val module: XposedModule,
+    val app: Application,
     val classLoader: ClassLoader,
     val prefs: Prefs,
     val processName: String,
     val targetPackage: String,
 ) {
 
-    /** 是否运行在便签主进程（子进程通常不加载 UI 相关 Hook） */
     val isMainProcess: Boolean
         get() = processName == targetPackage
 
@@ -28,17 +27,24 @@ class HookContext(
             .onFailure { XLog.w("class not found: $className") }
             .getOrNull()
 
+    fun findClassOrThrow(className: String): Class<*>? = findClass(className)
+
     fun findMethod(
         className: String,
         methodName: String,
         vararg parameterTypes: Class<*>,
-    ): Method? {
-        val clazz = findClass(className) ?: return null
-        return runCatching { clazz.getDeclaredMethod(methodName, *parameterTypes) }
-            .onFailure { XLog.w("method not found: $className#$methodName(${parameterTypes.joinToString { it.simpleName }})") }
-            .getOrNull()
-            ?.apply { isAccessible = true }
-    }
+    ): Method? = findClass(className)?.let { findMethod(it, methodName, *parameterTypes) }
+
+    fun findMethod(
+        clazz: Class<*>,
+        methodName: String,
+        vararg parameterTypes: Class<*>,
+    ): Method? = runCatching { clazz.getDeclaredMethod(methodName, *parameterTypes) }
+        .onFailure {
+            XLog.w("method not found: ${clazz.name}#$methodName(${parameterTypes.joinToString { it.simpleName }})")
+        }
+        .getOrNull()
+        ?.apply { isAccessible = true }
 
     fun findMethods(className: String, methodName: String): List<Method> {
         val clazz = findClass(className) ?: return emptyList()
@@ -47,35 +53,78 @@ class HookContext(
             .onEach { it.isAccessible = true }
     }
 
-    fun findConstructor(className: String, vararg parameterTypes: Class<*>): Constructor<*>? {
-        val clazz = findClass(className) ?: return null
-        return runCatching { clazz.getDeclaredConstructor(*parameterTypes) }
-            .onFailure { XLog.w("constructor not found: $className") }
-            .getOrNull()
-            ?.apply { isAccessible = true }
+    fun findMethods(clazz: Class<*>, methodName: String): List<Method> =
+        clazz.declaredMethods.filter { it.name == methodName }.onEach { it.isAccessible = true }
+
+    fun findConstructor(className: String, vararg parameterTypes: Class<*>): Constructor<*>? =
+        findClass(className)?.let { clazz ->
+            runCatching { clazz.getDeclaredConstructor(*parameterTypes) }
+                .onFailure { XLog.w("constructor not found: $className") }
+                .getOrNull()
+                ?.apply { isAccessible = true }
+        }
+
+    fun hook(
+        method: Method,
+        before: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
+        after: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
+    ): Boolean = runCatching {
+        method.isAccessible = true
+        XposedBridge.hookMethod(method, object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                before?.invoke(param)
+            }
+
+            override fun afterHookedMethod(param: MethodHookParam) {
+                after?.invoke(param)
+            }
+        })
+        true
+    }.getOrElse {
+        XLog.e("hook failed: ${method.declaringClass.name}#${method.name}", it)
+        false
     }
 
-    /**
-     * 注册 Hook。hooker 内可读取/修改参数与返回值，必须调用 chain.proceed()
-     * 才会执行原方法（除非有意拦截）。
-     */
-    fun hook(
-        executable: Executable,
-        hooker: (XposedInterface.Chain) -> Any?,
-    ): XposedInterface.HookHandle? =
-        runCatching {
-            executable.isAccessible = true
-            module.hook(executable).intercept { chain -> hooker(chain) }
-        }.onFailure {
-            XLog.e("hook failed: ${executable.toGenericString()}", it)
-        }.getOrNull()
+    fun hookConstructor(
+        constructor: Constructor<*>,
+        after: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
+    ): Boolean = runCatching {
+        constructor.isAccessible = true
+        XposedBridge.hookMethod(constructor, object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                after?.invoke(param)
+            }
+        })
+        true
+    }.getOrElse {
+        XLog.e("hook ctor failed: ${constructor.declaringClass.name}", it)
+        false
+    }
 
-    /** 便捷写法：按类名 + 方法名 Hook，方法不存在时静默跳过 */
+    /** 按类名 + 方法名 Hook，方法不存在时静默跳过（返回 false） */
     fun hookMethod(
         className: String,
         methodName: String,
         vararg parameterTypes: Class<*>,
-        hooker: (XposedInterface.Chain) -> Any?,
-    ): XposedInterface.HookHandle? =
-        findMethod(className, methodName, *parameterTypes)?.let { hook(it, hooker) }
+        before: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
+        after: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
+    ): Boolean {
+        val method = findMethod(className, methodName, *parameterTypes) ?: return false
+        return hook(method, before, after)
+    }
+
+    /** Hook 某类中所有同名方法 */
+    fun hookAllMethods(
+        className: String,
+        methodName: String,
+        before: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
+        after: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
+    ): Int {
+        val methods = findMethods(className, methodName)
+        if (methods.isEmpty()) {
+            XLog.w("no method $className#$methodName")
+            return 0
+        }
+        return methods.count { hook(it, before, after) }
+    }
 }

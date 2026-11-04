@@ -1,23 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OPPO便签模块</string>
-    <string name="module_description">OPPO 便签（com.coloros.note）LSPosed 模块框架，功能按需扩展。</string>
+    <string name="module_description">OPPO 便签增强：模块设置入口、批量与排版、待办增强。</string>
 
-    <string name="header_title">OPPO便签模块</string>
-    <string name="header_subtitle">LSPosed Module · 框架已就绪</string>
+    <string name="module_settings_title">模块设置</string>
+    <string name="module_settings_subtitle">OPPO便签模块 · 本地增强，不改动云端数据</string>
 
-    <string name="section_status">运行状态</string>
-    <string name="section_features">功能开关</string>
-    <string name="section_about">说明</string>
+    <string name="batch_title">批量与排版</string>
+    <string name="batch_entry_title">批量与排版</string>
+    <string name="batch_entry_summary">批量生成日历清单，按列对齐排版</string>
 
-    <string name="status_target">目标应用</string>
-    <string name="status_version">便签版本</string>
-    <string name="status_module">模块版本</string>
-    <string name="status_installed">已安装</string>
-    <string name="status_not_installed">未安装</string>
+    <string name="todo_entry_title">待办增强</string>
+    <string name="todo_entry_summary">每日刷新、一行多列、勾选框右置</string>
 
-    <string name="about_text">当前版本仅包含模块框架与自检功能，具体 Hook 功能待添加。\n\n启用后请在 LSPosed 中勾选作用域「便签」，并重启便签进程使其生效。\n\n日志标签：OPPONote</string>
+    <string name="home_entry_title">首页样式</string>
+    <string name="home_entry_summary">让笔记列表更醒目</string>
 
-    <string name="btn_open_note">打开便签</string>
-    <string name="toast_note_missing">未检测到便签应用</string>
+    <string name="diag_entry_title">框架自检</string>
+    <string name="diag_entry_summary">仅记录日志，便于排查模块是否生效</string>
+
+    <string name="about_title">关于</string>
+    <string name="about_text">本模块只修改本机的显示与编辑行为，不改变便签的云端数据结构。\n\n使用前请在 LSPosed 中启用并勾选作用域「便签」，修改设置后强行停止便签再打开。</string>
+
+    <string name="section_fields">字段</string>
+    <string name="section_date">日历设置</string>
+    <string name="section_layout">排版</string>
+    <string name="section_preview">预览</string>
+
+    <string name="add_date_field">＋ 日历</string>
+    <string name="add_text_field">＋ 文字</string>
+    <string name="field_type_date">日历</string>
+    <string name="field_type_text">文字</string>
+    <string name="field_delete">删除</string>
+    <string name="field_empty">还没有字段，先添加一个日历或文字</string>
+
+    <string name="pattern_hint">日期格式，如 MM.dd、M月d日、yyyy年M月d日 EEE</string>
+    <string name="pattern_help">支持 Java 日期格式：yyyy 年、M 月、d 日、EEE 周几、HH:mm 时间</string>
+
+    <string name="interval_daily">每天</string>
+    <string name="interval_every_n">隔 N 天</string>
+    <string name="interval_weekly">每周</string>
+    <string name="interval_days_hint">间隔天数</string>
+    <string name="count_hint">生成条数</string>
+
+    <string name="layout_space">空格分隔（同一行）</string>
+    <string name="layout_newline">换行分隔（每字段一行）</string>
+    <string name="space_count_hint">字段之间空格数</string>
+    <string name="blank_lines_hint">字段之间空行数（0 = 紧凑）</string>
+    <string name="align_columns">按列对齐（中文按两个宽度计算）</string>
+
+    <string name="btn_generate">生成并发送到便签</string>
+    <string name="btn_copy">复制到剪贴板</string>
+    <string name="btn_clean">清理过期行</string>
+
+    <string name="toast_no_field">请先添加至少一个字段</string>
+    <string name="toast_copied">已复制</string>
+    <string name="toast_no_note">未找到便签，内容已复制到剪贴板</string>
+    <string name="toast_cleaned">已删除 %1$d 行过期记录</string>
+    <string name="toast_nothing_cleaned">没有可清理的过期行</string>
+    <string name="toast_bad_number">请输入有效数字</string>
+
+    <string name="text_field_dialog_title">文字字段内容</string>
+    <string name="text_field_hint">例如：完成</string>
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
 </resources>

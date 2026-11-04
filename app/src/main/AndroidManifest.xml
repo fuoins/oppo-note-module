@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Android 11+ 包可见性：用于读取便签版本与启动便签 -->
+    <!-- Android 11+ 包可见性：读取便签版本、拉起便签 -->
     <queries>
         <package android:name="com.coloros.note" />
     </queries>
@@ -13,17 +13,25 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- 无 LAUNCHER 入口：模块不在桌面显示图标，设置从便签「设置」进入 -->
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.SettingsActivity"
             android:exported="true"
-            android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:label="@string/module_settings_title" />
 
-        <!-- LSPosed / Xposed 模块声明 -->
+        <activity
+            android:name=".ui.BatchFormatActivity"
+            android:exported="true"
+            android:label="@string/batch_title"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 宿主进程读取模块配置的通道 -->
+        <provider
+            android:name=".core.ConfigProvider"
+            android:authorities="com.fuoins.opponote.config"
+            android:exported="true" />
+
+        <!-- Xposed / LSPosed 模块声明（传统 API 82，兼容所有 LSPosed 版本） -->
         <meta-data
             android:name="xposedmodule"
             android:value="true" />
@@ -32,7 +40,7 @@
             android:value="@string/module_description" />
         <meta-data
             android:name="xposedminversion"
-            android:value="100" />
+            android:value="82" />
         <meta-data
             android:name="xposedscope"
             android:resource="@array/xposed_scope" />
