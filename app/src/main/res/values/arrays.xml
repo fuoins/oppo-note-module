@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- LSPosed 作用域：仅 OPPO 便签 -->
+    <string-array name="xposed_scope">
+        <item>com.coloros.note</item>
+    </string-array>
+</resources>

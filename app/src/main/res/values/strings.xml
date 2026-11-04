@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OPPO便签模块</string>
+    <string name="module_description">OPPO 便签（com.coloros.note）LSPosed 模块框架，功能按需扩展。</string>
+
+    <string name="header_title">OPPO便签模块</string>
+    <string name="header_subtitle">LSPosed Module · 框架已就绪</string>
+
+    <string name="section_status">运行状态</string>
+    <string name="section_features">功能开关</string>
+    <string name="section_about">说明</string>
+
+    <string name="status_target">目标应用</string>
+    <string name="status_version">便签版本</string>
+    <string name="status_module">模块版本</string>
+    <string name="status_installed">已安装</string>
+    <string name="status_not_installed">未安装</string>
+
+    <string name="about_text">当前版本仅包含模块框架与自检功能，具体 Hook 功能待添加。\n\n启用后请在 LSPosed 中勾选作用域「便签」，并重启便签进程使其生效。\n\n日志标签：OPPONote</string>
+
+    <string name="btn_open_note">打开便签</string>
+    <string name="toast_note_missing">未检测到便签应用</string>
+</resources>

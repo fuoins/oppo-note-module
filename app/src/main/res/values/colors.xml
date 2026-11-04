@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#F5A623</color>
+    <color name="brand_dark">#B86E00</color>
+    <color name="page_bg">#FFF9F0</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="text_primary">#1F1B16</color>
+    <color name="text_secondary">#7A7168</color>
+    <color name="divider">#F0E6D8</color>
+</resources>
