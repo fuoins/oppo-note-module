@@ -1,33 +1,25 @@
 package com.fuoins.opponote.hooks
 
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import com.fuoins.opponote.core.Feature
 import com.fuoins.opponote.core.HookContext
+import com.fuoins.opponote.util.WebViewWatcher
 import com.fuoins.opponote.util.XLog
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import java.util.Collections
 import java.util.WeakHashMap
 
 /**
- * 编辑页结构探测。
+ * 编辑页结构探测（内部功能，不暴露开关）。
  *
- * 便签的正文是 WebView 富文本，待办块的 DOM 结构随版本变化、且类名混淆，
- * 静态分析拿不到可靠的插入点。这里在页面加载完成后注入一段只读脚本，
- * 把元素结构写进「运行日志」，据此确定 CSS 注入规则。
- *
- * 只读 DOM，不修改任何内容，每个 WebView 实例只探测一次。
+ * 在页面加载完成后注入只读脚本，把元素统计与待办候选节点的结构写进运行日志，
+ * 用于后续功能（待办、排版、首页）的样式适配。只读 DOM，不改内容。
  */
 class WebProbeFeature : Feature {
 
     override val id = "web_probe"
     override val title = "编辑页结构探测"
-    override val summary = "把编辑页 DOM 结构写入运行日志，用于适配待办样式"
+    override val summary = "内部调试：把编辑页 DOM 结构写入运行日志"
     override val enabledByDefault = true
-
-    /** 已 hook 过的 WebViewClient 实现类，避免重复注册 */
-    private val hookedClients = Collections.synchronizedSet(HashSet<String>())
 
     /** 每个 WebView 只探测一次 */
     private val probed = Collections.synchronizedSet(
@@ -35,48 +27,8 @@ class WebProbeFeature : Feature {
     )
 
     override fun install(ctx: HookContext) {
-        val setClient = ctx.findMethod(
-            WebView::class.java,
-            "setWebViewClient",
-            WebViewClient::class.java,
-        )
-        if (setClient == null) {
-            XLog.w("web_probe: WebView.setWebViewClient 未找到")
-            return
-        }
-
-        val ok = ctx.hook(setClient, after = { param: XC_MethodHook.MethodHookParam ->
-            val client = param.args.getOrNull(0) as? WebViewClient ?: return@hook
-            hookClient(client)
-        })
-        XLog.i("web_probe: setWebViewClient hooked=$ok")
-    }
-
-    private fun hookClient(client: WebViewClient) {
-        val clazz = client.javaClass
-        val name = clazz.name
-        if (!hookedClients.add(name)) return
-
-        val methods = clazz.declaredMethods.filter {
-            it.name == "onPageFinished" && it.parameterTypes.size == 2
-        }
-        if (methods.isEmpty()) {
-            XLog.i("web_probe: ${clazz.simpleName} 未重写 onPageFinished")
-            return
-        }
-
-        methods.forEach { method ->
-            runCatching {
-                method.isAccessible = true
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val view = param.args.getOrNull(0) as? WebView ?: return
-                        probe(view)
-                    }
-                })
-                XLog.i("web_probe: hooked ${clazz.simpleName}#onPageFinished")
-            }.onFailure { XLog.w("web_probe: hook ${clazz.simpleName} 失败", it) }
-        }
+        WebViewWatcher.install(ctx) { view -> probe(view) }
+        XLog.i("web_probe: 就绪")
     }
 
     private fun probe(view: WebView) {
@@ -89,10 +41,6 @@ class WebProbeFeature : Feature {
     }
 
     companion object {
-        /**
-         * 只读探测：统计标签/类名分布，并抓取待办候选元素的结构。
-         * 用 JSON 返回，避免换行在日志里丢失层次。
-         */
         private val PROBE_JS = """
         (function(){
           try {

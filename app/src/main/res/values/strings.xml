@@ -13,10 +13,10 @@
 
     <string name="batch_title">批量与排版</string>
     <string name="batch_entry_title">批量与排版</string>
-    <string name="batch_entry_summary">批量生成日历清单，按列对齐排版</string>
+    <string name="batch_entry_summary">在笔记「添加」面板加入批量生成入口</string>
 
     <string name="todo_entry_title">待办增强</string>
-    <string name="todo_entry_summary">每日刷新、一行多列、勾选框右置</string>
+    <string name="todo_entry_summary">勾选圈移到文字右侧，一行显示多个待办</string>
 
     <string name="home_entry_title">首页样式</string>
     <string name="home_entry_summary">让笔记列表更醒目</string>

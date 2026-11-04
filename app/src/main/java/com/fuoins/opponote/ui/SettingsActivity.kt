@@ -9,8 +9,8 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
-import android.widget.Toast
 import com.fuoins.opponote.R
+import com.fuoins.opponote.core.FeatureRegistry
 import com.fuoins.opponote.core.LogStore
 import com.fuoins.opponote.core.Prefs
 import java.util.concurrent.Executors
@@ -33,47 +33,37 @@ class SettingsActivity : Activity() {
 
         refreshHostStatus()
 
-        val entryContainer = findViewById<LinearLayout>(R.id.entry_container)
-        addEntry(entryContainer, getString(R.string.batch_entry_title), getString(R.string.batch_entry_summary)) {
-            startActivity(Intent(this, BatchFormatActivity::class.java))
-        }
-        addDivider(entryContainer)
-        addEntry(entryContainer, getString(R.string.todo_entry_title), getString(R.string.todo_entry_summary)) {
-            Toast.makeText(this, "待办增强正在适配，开关见下方", Toast.LENGTH_SHORT).show()
-        }
-        addDivider(entryContainer)
-        addEntry(entryContainer, getString(R.string.home_entry_title), getString(R.string.home_entry_summary)) {
-            Toast.makeText(this, "首页样式正在适配，开关见下方", Toast.LENGTH_SHORT).show()
-        }
-        addDivider(entryContainer)
-        addEntry(entryContainer, getString(R.string.log_entry_title), getString(R.string.log_entry_summary)) {
-            startActivity(Intent(this, LogActivity::class.java))
-        }
-
+        // 三个功能开关：批量与排版 / 待办增强 / 首页样式，默认全部开启
         val switchContainer = findViewById<LinearLayout>(R.id.switch_container)
         addSwitch(
             switchContainer,
-            "启用待办增强",
-            "每日刷新指定待办、一行多列显示",
-            "feature_todo_enhance",
-            false,
+            getString(R.string.batch_entry_title),
+            getString(R.string.batch_entry_summary),
+            FeatureRegistry.key("add_menu"),
+            true,
         )
         addDivider(switchContainer)
         addSwitch(
             switchContainer,
-            "启用首页样式增强",
-            "加大标题、突出卡片",
-            "feature_home_style",
-            false,
+            getString(R.string.todo_entry_title),
+            getString(R.string.todo_entry_summary),
+            FeatureRegistry.key("todo_enhance"),
+            true,
         )
         addDivider(switchContainer)
         addSwitch(
             switchContainer,
-            getString(R.string.diag_entry_title),
-            getString(R.string.diag_entry_summary),
-            "feature_diagnostics",
-            false,
+            getString(R.string.home_entry_title),
+            getString(R.string.home_entry_summary),
+            FeatureRegistry.key("home_style"),
+            true,
         )
+
+        // 运行日志入口
+        val entryContainer = findViewById<LinearLayout>(R.id.entry_container)
+        addEntry(entryContainer, getString(R.string.log_entry_title), getString(R.string.log_entry_summary)) {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
     }
 
     override fun onResume() {

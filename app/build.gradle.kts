@@ -8,7 +8,7 @@ val releaseKeystore: String? =
     System.getenv("KEYSTORE_FILE")?.takeIf { it.isNotBlank() && file(it).exists() }
 
 // 允许 CI 用 tag 覆盖版本号：./gradlew -PversionName=1.2.3 -PversionCode=12
-val ciVersionName: String = (findProperty("versionName") as String?) ?: "1.2.1"
+val ciVersionName: String = (findProperty("versionName") as String?) ?: "1.3.0"
 val ciVersionCode: String = (findProperty("versionCode") as String?) ?: "1"
 
 android {
