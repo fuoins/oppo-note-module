@@ -1,7 +1,9 @@
 package com.fuoins.opponote.core
 
+import com.fuoins.opponote.hooks.AddMenuFeature
 import com.fuoins.opponote.hooks.DiagnosticsFeature
 import com.fuoins.opponote.hooks.SettingsEntryFeature
+import com.fuoins.opponote.hooks.WebProbeFeature
 import com.fuoins.opponote.util.XLog
 
 /**
@@ -11,6 +13,8 @@ object FeatureRegistry {
 
     val all: List<Feature> = listOf(
         SettingsEntryFeature,
+        AddMenuFeature(),
+        WebProbeFeature(),
         DiagnosticsFeature,
     )
 
