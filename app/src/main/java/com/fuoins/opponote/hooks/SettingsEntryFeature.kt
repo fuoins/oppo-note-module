@@ -51,7 +51,7 @@ object SettingsEntryFeature : Feature {
             return
         }
         val screen = prefFragment.preferenceScreen ?: return
-        if (screen.findPreference(KEY) != null) return
+        if (screen.findPreference<Preference>(KEY) != null) return
 
         val context = prefFragment.requireContext()
         val preference = Preference(context).apply {
