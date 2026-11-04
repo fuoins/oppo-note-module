@@ -1,6 +1,7 @@
 package com.fuoins.opponote
 
 import android.app.Application
+import android.app.Instrumentation
 import com.fuoins.opponote.core.FeatureRegistry
 import com.fuoins.opponote.core.HookContext
 import com.fuoins.opponote.core.Prefs
@@ -28,17 +29,41 @@ class ModuleEntry : IXposedHookLoadPackage {
             .onFailure { XLog.e("hook Application.onCreate failed", it) }
     }
 
+    /**
+     * 双保险获取 Application：
+     * 1. Instrumentation.callApplicationOnCreate —— 系统必然调用，参数就是 Application；
+     * 2. Application.onCreate —— 兜底，兼容个别定制 ROM。
+     * 任一先到即安装，另一路因 [installed] 直接退出。
+     */
     private fun hookApplicationCreate(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val onCreate = Application::class.java.getDeclaredMethod("onCreate")
-        XposedBridge.hookMethod(onCreate, object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val app = param.thisObject as? Application ?: return
-                if (!installed.compareAndSet(false, true)) return
-                runCatching { install(app, lpparam) }
-                    .onFailure { XLog.e("install features failed", it) }
-            }
-        })
-        XLog.i("waiting for Application.onCreate")
+        runCatching {
+            val method = Instrumentation::class.java
+                .getDeclaredMethod("callApplicationOnCreate", Application::class.java)
+            method.isAccessible = true
+            XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val app = param.args.getOrNull(0) as? Application ?: return
+                    if (!installed.compareAndSet(false, true)) return
+                    runCatching { install(app, lpparam) }
+                        .onFailure { XLog.e("install features failed", it) }
+                }
+            })
+            XLog.i("hook Instrumentation.callApplicationOnCreate ok")
+        }.onFailure { XLog.e("hook callApplicationOnCreate failed", it) }
+
+        runCatching {
+            val onCreate = Application::class.java.getDeclaredMethod("onCreate")
+            onCreate.isAccessible = true
+            XposedBridge.hookMethod(onCreate, object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val app = param.thisObject as? Application ?: return
+                    if (!installed.compareAndSet(false, true)) return
+                    runCatching { install(app, lpparam) }
+                        .onFailure { XLog.e("install features failed", it) }
+                }
+            })
+            XLog.i("hook Application.onCreate ok")
+        }.onFailure { XLog.e("hook Application.onCreate failed", it) }
     }
 
     private fun install(app: Application, lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -54,6 +79,7 @@ class ModuleEntry : IXposedHookLoadPackage {
             targetPackage = TARGET_PACKAGE,
         )
         FeatureRegistry.installAll(context)
+        XLog.i("all features processed, flushing log")
         LogSink.flushNow()
     }
 

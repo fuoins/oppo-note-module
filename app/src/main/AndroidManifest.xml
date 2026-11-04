@@ -13,11 +13,18 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- 无 LAUNCHER 入口：模块不在桌面显示图标，设置从便签「设置」进入 -->
+        <!-- 无 LAUNCHER 入口：模块不在桌面显示图标，设置从便签「设置」进入。
+             但注入失败时用户无法进入模块，故为设置页保留一个可显式启动的入口，
+             同时支持 adb shell am start -n com.fuoins.opponote/.ui.SettingsActivity -->
         <activity
             android:name=".ui.SettingsActivity"
             android:exported="true"
-            android:label="@string/module_settings_title" />
+            android:label="@string/module_settings_title">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ui.BatchFormatActivity"

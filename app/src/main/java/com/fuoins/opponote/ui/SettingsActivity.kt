@@ -3,26 +3,35 @@ package com.fuoins.opponote.ui
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import com.fuoins.opponote.R
+import com.fuoins.opponote.core.LogStore
 import com.fuoins.opponote.core.Prefs
+import java.util.concurrent.Executors
 
 /**
- * 模块设置主页，从便签「设置 → 模块设置」进入。
- * 模块自身没有桌面图标。
+ * 模块设置主页。
+ * 正常路径从便签「设置 → 模块设置」进入；排障期间保留桌面图标，
+ * 直接打开可查看宿主连接状态与运行日志。
  */
 class SettingsActivity : Activity() {
 
     private lateinit var prefs: android.content.SharedPreferences
+    private val main = Handler(Looper.getMainLooper())
+    private val io = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
         prefs = getSharedPreferences(Prefs.GROUP, MODE_PRIVATE)
+
+        refreshHostStatus()
 
         val entryContainer = findViewById<LinearLayout>(R.id.entry_container)
         addEntry(entryContainer, getString(R.string.batch_entry_title), getString(R.string.batch_entry_summary)) {
@@ -65,6 +74,39 @@ class SettingsActivity : Activity() {
             "feature_diagnostics",
             false,
         )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshHostStatus()
+    }
+
+    override fun onDestroy() {
+        io.shutdownNow()
+        super.onDestroy()
+    }
+
+    /** 依据宿主写回的日志判断注入是否发生过，显示在副标题位置 */
+    private fun refreshHostStatus() {
+        val statusView = findViewById<TextView>(R.id.tv_status) ?: return
+        io.execute {
+            val text = LogStore.read(this)
+            val connected = text.contains("loadPackage")
+            val installed = text.contains("installed [")
+            val entryAdded = text.contains("settings entry added")
+            main.post {
+                statusView.text = when {
+                    connected && entryAdded ->
+                        getString(R.string.status_ok_entry)
+                    connected && installed ->
+                        getString(R.string.status_ok_no_entry)
+                    connected ->
+                        getString(R.string.status_connected_err)
+                    else ->
+                        getString(R.string.status_not_connected)
+                }
+            }
+        }
     }
 
     private fun addEntry(container: LinearLayout, title: String, summary: String, onClick: () -> Unit) {

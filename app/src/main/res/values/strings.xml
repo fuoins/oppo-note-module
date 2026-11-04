@@ -6,6 +6,11 @@
     <string name="module_settings_title">模块设置</string>
     <string name="module_settings_subtitle">OPPO便签模块 · 本地增强，不改动云端数据</string>
 
+    <string name="status_ok_entry">✓ 宿主已连接，设置页入口已添加</string>
+    <string name="status_ok_no_entry">✓ 宿主已连接，但设置入口未添加，见运行日志</string>
+    <string name="status_connected_err">宿主已连接，但功能安装有报错，见运行日志</string>
+    <string name="status_not_connected">✗ 宿主未连接。请在 LSPosed 中启用模块、勾选「便签」，再强行停止便签后打开</string>
+
     <string name="batch_title">批量与排版</string>
     <string name="batch_entry_title">批量与排版</string>
     <string name="batch_entry_summary">批量生成日历清单，按列对齐排版</string>
