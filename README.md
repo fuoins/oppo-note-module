@@ -1,8 +1,8 @@
 # OPPO便签模块
 
-面向 OPPO 便签（`com.coloros.note`）的 LSPosed 模块，基于 [libxposed API](https://github.com/LSPosed/LSPosed) 构建，全程由 **GitHub Actions** 编译出包。
+面向 OPPO 便签（`com.coloros.note`）的 LSPosed 模块，由 **GitHub Actions** 编译出包。
 
-> 当前版本只包含**模块框架 + 自检功能**（仅写日志，不修改便签行为）。具体 Hook 功能按需求在 `FeatureRegistry` 中逐项添加。
+> 模块基于**传统 XposedBridge API 82**，兼容所有 LSPosed 版本，不依赖会随版本变化的 libxposed API。
 
 ## 目标应用
 
@@ -12,88 +12,108 @@
 | 已验证版本 | 16.7.2（versionCode 160070002） |
 | 入口 Application | `com.nearme.note.MyApplication` |
 | 主 Activity | `com.nearme.note.main.MainActivity` |
-| 主要代码包 | `com.nearme.note` / `com.oplus.note` |
+| 设置页 | `com.nearme.note.setting.SettingsActivity` → `SettingFragment` |
+| 待办列表 | `com.nearme.note.activity.list.TodoAdapter` |
+
+## 功能
+
+### 已实现
+
+- **模块无桌面图标**：安装后不在桌面显示，避免误触；
+- **设置页入口**：在便签「设置」列表底部插入「模块设置」，点击进入模块界面；
+- **批量与排版**：
+  - 字段可自由组合：日历、任意文字（完成 / 忘记 / …）；
+  - 日历支持 Java 日期格式，内置 `11.04`、`11月4日`、`2026年11月4日`、`11月4日 周三`、`11.04 14:30` 等预设，也可自定义；
+  - 间隔方式：每天、隔 N 天、每周固定星期几；
+  - 批量条数可设置（1–2000）；
+  - 排版：字段间用 N 个空格，或换行（0 = 每字段一行）；
+  - 列对齐：按显示宽度补齐空格，中文按 2 个半角宽度计算；
+  - 生成结果可直接发送到便签新建笔记，或复制到剪贴板；
+  - **清理过期行**：按当前日期格式识别行首日期，删除早于今天的整行（粘贴文本 → 清理 → 复制回去）。
+
+### 适配中
+
+- 待办每日刷新、一行多列、勾选框右置；
+- 首页列表样式增强。
+
+这两项需要改动便签的 RecyclerView 与 ViewBinding 布局（`TodoAdapter`、`com.oplus.note.databinding.*`），
+不同 ROM 版本布局存在差异，需结合真机日志逐步适配。开关已在模块设置中预留，默认关闭。
+
+## 安装与生效
+
+1. 安装 APK（模块无桌面图标，属正常现象）；
+2. LSPosed 中启用「OPPO便签模块」，作用域勾选「便签」；
+3. 强行停止便签，重新打开；
+4. 便签「设置」→ 最下方「模块设置」；
+5. 验证：`adb logcat -s OPPONote` 应出现
+   ```
+   loadPackage: process=com.coloros.note
+   Application ready, installing features
+   settings entry hooked=true
+   settings entry added
+   ```
+
+> 修改开关后需强行停止便签进程再打开才生效。
 
 ## 目录结构
 
 ```
 app/src/main/java/com/fuoins/opponote/
-├── ModuleEntry.kt              # 模块入口（assets/xposed_init 指定）
+├── ModuleEntry.kt              # IXposedHookLoadPackage 入口
 ├── core/
 │   ├── Feature.kt              # 功能接口
-│   ├── FeatureRegistry.kt      # 功能注册表（新增功能只需改这里）
-│   ├── HookContext.kt          # 类/方法查找与 Hook 便捷封装
-│   └── Prefs.kt                # 配置读写（与模块 App 共用）
+│   ├── FeatureRegistry.kt      # 功能注册表
+│   ├── HookContext.kt          # 反射查找 + Hook 封装
+│   ├── Prefs.kt                # 宿主侧配置读取
+│   ├── ConfigProvider.kt       # 模块侧配置暴露（ContentProvider）
+│   ├── BatchEngine.kt          # 批量生成与列对齐算法
+│   └── ExpiredCleaner.kt       # 过期行清理
 ├── hooks/
-│   └── DiagnosticsFeature.kt   # 自检：仅记录日志
-├── ui/MainActivity.kt          # 模块配置界面
-└── util/XLog.kt                # 统一日志（TAG = OPPONote）
+│   ├── SettingsEntryFeature.kt # 设置页入口注入
+│   └── DiagnosticsFeature.kt   # 自检日志
+├── ui/
+│   ├── SettingsActivity.kt     # 模块设置
+│   └── BatchFormatActivity.kt  # 批量与排版
+└── util/XLog.kt
+
+xposed-api-stub/                # 传统 Xposed API 编译期桩（不打包）
 ```
 
 ## 添加一个新功能
 
-1. 在 `hooks/` 下新建对象实现 `Feature`：
-
 ```kotlin
-object NoUpdateDialogFeature : Feature {
-    override val id = "no_update_dialog"
-    override val title = "屏蔽更新弹窗"
-    override val summary = "拦截强制升级提示"
+object MyFeature : Feature {
+    override val id = "my_feature"
+    override val title = "我的功能"
+    override val summary = "说明"
     override val enabledByDefault = false
 
     override fun install(ctx: HookContext) {
-        ctx.hookMethod("com.nearme.note.xxx.UpdateHelper", "showDialog") { chain ->
-            XLog.i("update dialog blocked")
-            null // 不调用 chain.proceed() 即拦截
-        }
+        ctx.hookMethod(
+            "com.nearme.note.xxx.Target",
+            "methodName",
+            String::class.java,
+            after = { param: XC_MethodHook.MethodHookParam ->
+                // 处理
+            },
+        )
     }
 }
 ```
 
-2. 注册到 `FeatureRegistry.all`，UI 开关会自动出现。
-
-## 待定功能（按需实现）
-
-框架已就绪，以下方向可按需求逐项实现，每项独立成一个 `Feature`：
-
-- 去广告 / 去推广位（开屏、信息流、Banner）
-- 去更新提示（强制升级弹窗）
-- 解除导出 / 分享格式限制
-
-> 新增功能请先在真机确认目标类与方法签名，再编写 Hook；`XLog` + LSPosed 日志可直接观察调用链。
+注册到 `FeatureRegistry.all` 即可，设置页开关会自动出现（需自行在 SettingsActivity 添加入口）。
 
 ## 构建
 
-### GitHub Actions（推荐）
-
-推送到 `main` 或手动触发 `Build` workflow，产物在 Actions 的 Artifacts 中。
-打 `v*` 标签会自动创建 Release：
-
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-```
-
-Release 使用仓库 Secrets 中的固定签名（`KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`），
-未配置时自动回退到 debug 签名。
-
-### 本地
+- 推送到 `main` / 手动触发：生成 debug + release APK 到 Actions Artifacts；
+- 打 `v*` 标签：自动创建 Release 并上传 release APK；
+- Release 使用仓库 Secrets 中的固定签名（`KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`），未配置时回退 debug 签名。
 
 ```bash
-./gradlew assembleDebug
+./gradlew assembleRelease
 ```
-
-## 安装与生效
-
-1. 安装 APK；
-2. LSPosed 中启用「OPPO便签模块」，作用域勾选「便签」；
-3. 强行停止并重新打开便签；
-4. 在 LSPosed 日志或 `adb logcat -s OPPONote` 中确认：
-   ```
-   module loaded: process=com.coloros.note, api=102
-   diagnostics: MainActivity.onCreate reached, hook chain works
-   ```
 
 ## 说明
 
-- 模块运行时依赖框架提供的 `io.github.libxposed:api`，该依赖为 `compileOnly`，不会打包进 APK。
-- 修改功能开关后需重启便签进程才能生效。
+- 所有 Hook 均在 `runCatching` 中执行，失败只记录日志，不影响便签原有流程；
+- 模块只处理本机文本与显示，不修改便签数据库结构，不干预云同步协议。
