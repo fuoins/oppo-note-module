@@ -31,10 +31,16 @@ import com.fuoins.opponote.core.FieldType
 import com.fuoins.opponote.core.IntervalMode
 import com.fuoins.opponote.core.LayoutConfig
 import com.fuoins.opponote.core.LayoutMode
+import com.fuoins.opponote.core.LogStore
 import com.fuoins.opponote.core.Prefs
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * 批量与排版：按字段序列批量生成日历清单，并支持列对齐排版。
@@ -60,16 +66,63 @@ class BatchFormatActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_batch_format)
-        prefs = getSharedPreferences(Prefs.GROUP, MODE_PRIVATE)
+        installCrashGuard()
+        step("onCreate start")
 
-        bindViews()
-        setupWeekdaySpinner()
-        setupPresets()
-        loadConfig()
-        renderFields()
-        setupListeners()
-        refreshPreview()
+        // 分步初始化并打点：任何一步异常都记录到模块日志，并给出明确提示
+        runCatching {
+            setContentView(R.layout.activity_batch_format)
+            step("setContentView ok")
+            prefs = getSharedPreferences(Prefs.GROUP, MODE_PRIVATE)
+            bindViews()
+            step("bindViews ok")
+            setupWeekdaySpinner()
+            step("spinner ok")
+            setupPresets()
+            step("presets ok")
+            loadConfig()
+            step("loadConfig ok")
+            renderFields()
+            step("renderFields ok")
+            setupListeners()
+            step("listeners ok")
+            refreshPreview()
+            step("preview ok, UI ready")
+        }.onFailure { t ->
+            step("CRASH ${t.javaClass.name}: ${t.message}")
+            t.stackTrace.take(14).forEach { step("    at $it") }
+            Toast.makeText(
+                this,
+                "批量排版界面启动失败：${t.message}\n详细信息已写入模块日志",
+                Toast.LENGTH_LONG,
+            ).show()
+            finish()
+        }
+    }
+
+    /** 分步打点：写入模块日志（「运存日志」页可见），不依赖 prefs 等任何初始化状态 */
+    private fun step(msg: String) {
+        runCatching {
+            val ts = java.text.SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.CHINA).format(Date())
+            LogStore.append(this, "[batch] $ts $msg\n")
+        }
+    }
+
+    /** 模块进程崩溃捕获：主线程未捕获异常写文件 + 模块日志，再交给系统默认处理 */
+    private fun installCrashGuard() {
+        val prev = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching {
+                val ts = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.CHINA)
+                    .format(Date())
+                val sw = StringWriter()
+                e.printStackTrace(PrintWriter(sw))
+                File(filesDir, "opponote_crash.log")
+                    .appendText("===== $ts thread=${t.name} =====\n$sw\n")
+                LogStore.append(this, "[batch-crash] $ts thread=${t.name}\n$sw\n")
+            }
+            prev?.uncaughtException(t, e)
+        }
     }
 
     private fun bindViews() {
