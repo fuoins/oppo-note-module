@@ -25,6 +25,8 @@
 
         <!-- 字段 -->
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             style="@style.SectionTitle"
             android:text="@string/section_fields" />
 
@@ -63,11 +65,15 @@
 
                 <Button
                     android:id="@+id/btn_add_date"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     style="@style.MiniButton"
                     android:text="@string/add_date_field" />
 
                 <Button
                     android:id="@+id/btn_add_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     style="@style.MiniButton"
                     android:text="@string/add_text_field" />
             </LinearLayout>
@@ -75,6 +81,8 @@
 
         <!-- 日历设置 -->
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             style="@style.SectionTitle"
             android:text="@string/section_date" />
 
@@ -187,6 +195,8 @@
 
         <!-- 排版 -->
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             style="@style/SectionTitle"
             android:text="@string/section_layout" />
 
@@ -252,6 +262,8 @@
 
         <!-- 预览 -->
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             style="@style.SectionTitle"
             android:text="@string/section_preview" />
 
@@ -289,16 +301,18 @@
 
             <Button
                 android:id="@+id/btn_copy"
-                style="@style/MiniButton"
                 android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
+                style="@style/MiniButton"
                 android:text="@string/btn_copy" />
 
             <Button
                 android:id="@+id/btn_clean"
-                style="@style/MiniButton"
                 android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
+                style="@style/MiniButton"
                 android:text="@string/btn_clean" />
         </LinearLayout>
     </LinearLayout>
