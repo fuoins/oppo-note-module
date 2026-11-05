@@ -95,3 +95,17 @@ jobs:
             --generate-notes \
             app/build/outputs/apk/release/*.apk \
           || gh release upload "$TAG" app/build/outputs/apk/release/*.apk --clobber
+
+      - name: Keep only latest release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "保留最新 Release: ${TAG}，删除其余"
+          gh release list --json tagName --jq '.[].tagName' | while read -r old; do
+            if [ "$old" != "$TAG" ]; then
+              echo "删除旧 Release: $old"
+              gh release delete "$old" --yes --cleanup-tag || true
+            fi
+          done
